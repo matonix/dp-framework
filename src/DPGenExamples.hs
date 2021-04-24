@@ -5,15 +5,10 @@ module DPGenExamples where
 
 import Data.Array
 import Data.Array.ST.Safe
-  ( MArray,
-    newListArray,
-    readArray,
-    runSTArray,
-    writeArray,
-  )
 import Data.Function
 import Data.List
-import Debug.Trace (traceShowId)
+import Debug.Trace
+import Data.Maybe
 
 type Dfn i e = (Ini i e, Eqn i e)
 
@@ -36,7 +31,7 @@ data Expr i e
   | UnOp (e -> e) (Expr i e)
   | BinOp (e -> e -> e) (Expr i e) (Expr i e)
 
-newtype Ini i e = Ini (i -> e)
+newtype Ini i e = Ini (i -> Maybe e)
 
 -- |
 -- interpret は可変配列を生成して eval を呼び出し、最終的にできた配列から解を得る
@@ -45,9 +40,11 @@ interpret dfn@(Ini icond, Rec idx := rhss) lu i = mkArr dfn lu ! i
 
 mkArr :: (Ix i, Show i) => Dfn i e -> (i, i) -> Array i e
 mkArr (Ini icond, eqn) lu = runSTArray $ do
-  let luEx = calcExtraOffset eqn lu
-  marr <- newListArray luEx $ map icond $ range luEx
-  sequence_ [eval eqn marr i | i <- range lu]
+  let luEx = traceShowId $ calcExtraOffset eqn lu
+  let (is, rs) = traceShowId $ partition (isJust . icond) $ range lu
+  marr <- newArray_ luEx 
+  sequence_ [traceShow ("init " ++ show i) $ writeArray marr i e | i <- is, let Just e = icond i]
+  sequence_ [traceShow ("eval " ++ show i) $ eval eqn marr i | i <- rs]
   return marr
 
 -- |
@@ -112,11 +109,24 @@ fib :: Dfn Int Int
 fib =
   ( Ini $
       \case
-        0 -> 1
-        1 -> 1
-        _ -> 0,
+        0 -> Just 1
+        1 -> Just 1
+        _ -> Nothing,
     Rec (+ 2)
       := [DP (+ 1) +# DP id ## Otherwise]
+  )
+
+-- >>> interpret fib (0, 30) 30
+-- 1346269
+fib2 :: Dfn Int Int
+fib2 =
+  ( Ini $
+      \case
+        0 -> Just 1
+        1 -> Just 1
+        _ -> Nothing,
+    Rec id
+      := [DP (\i -> i - 1) +# DP (\i -> i - 2) ## Otherwise]
   )
 
 -- |
@@ -125,7 +135,7 @@ fib =
 -- 94
 knapsack :: Dfn (Int, Int) Int
 knapsack =
-  ( Ini $ const 0,
+  ( Ini $ const $ Just 0,
     Rec (\(i, w) -> (i + 1, w))
       := [ DP (\(i, w) -> (i, w - weight ! i)) +# ItoE (\(i, w) -> value ! i) `maxE` DP id ## If (\(i, w) -> w >= weight ! i),
            DP id ## Otherwise
@@ -148,8 +158,8 @@ subsetsum =
   ( Ini $
       \(i, j) ->
         case (i, j) of
-          (0, 0) -> True
-          _ -> False,
+          (0, 0) -> Just True
+          _ -> Nothing,
     Rec (\(i, j) -> (i + 1, j))
       := [ DP (\(i, j) -> (i, j - a ! i)) ||# DP id ## If (\(i, j) -> j >= a ! i),
            DP id ## Otherwise
@@ -173,6 +183,9 @@ sumA = 10
 -- - もう少し書きやすくする（特にラムダ抽象）
 -- - 表現力を確認する（書けないDPはないか？）
 
+-- |
+-- 二通りで書いたときに、どちらの書き方でも動作するのが理想
+
 main :: IO ()
 main = do
   n <- readLn :: IO Int
@@ -190,9 +203,9 @@ cost h i j = abs $ (h ! i) - (h ! j)
 -- c_N = ?
 frog1 cost h =
   ( Ini $ \case
-      1 -> 0
-      2 -> cost h 1 2
-      _ -> 0,
+      1 -> Just 0
+      2 -> Just $ cost h 1 2
+      _ -> Nothing,
     Rec (+ 2) := [minE (DP (+ 1) +# ItoE (\i -> cost h (i + 1) (i + 2))) (DP id +# ItoE (\i -> cost h i (i + 2))) ## Otherwise]
   )
 
@@ -202,9 +215,9 @@ frog1 cost h =
 -- c_N = ?
 frog1' cost h =
   ( Ini $ \case
-      1 -> 0
-      2 -> cost h 1 2
-      _ -> 0,
+      1 -> Just 0
+      2 -> Just $ cost h 1 2
+      _ -> Nothing,
     Rec id := [DP (\i -> i - 1) +# ItoE (\i -> cost h i (i - 1)) `minE` DP (\i -> i - 2) +# ItoE (\i -> cost h i (i - 2)) ## Otherwise]
   )
 

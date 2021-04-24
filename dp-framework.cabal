@@ -26,13 +26,17 @@ common shared-properties
     , array
     , base              ^>=4.14.1.0
     , template-haskell
+    , vector
+    , bytestring
+    , massiv
+    , repa
 
 -- list of common dependencies
 
 library
   import:           shared-properties
   exposed-modules:
-    DPGen2
+    DPNkRepaDIM2
 
   -- Modules included in this library but not exported.
   -- other-modules:
