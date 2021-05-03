@@ -2,21 +2,35 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NPlusKPatterns #-}
 {-# LANGUAGE TypeApplications #-}
+{-# OPTIONS_GHC -O2 #-}
 
-module DPNkMassivM where
+module DPNkMassivMExamples where
 
+import qualified Data.Vector                   as V
+import qualified Data.Vector.Mutable           as VM
+import qualified Data.Vector.Unboxed           as VU
+import qualified Data.Vector.Unboxed.Mutable   as VUM
+import qualified Data.Vector.Generic           as VG
+import qualified Data.Vector.Generic.Mutable   as VGM
+import qualified Data.ByteString.Char8         as BS
+import qualified Data.ByteString.Lazy.Char8    as BSL
+import qualified Data.ByteString.Builder       as BSB
+import           Data.Char                      ( isSpace )
+import           Data.List                      ( unfoldr )
 import Control.Applicative (liftA2)
 import Control.Monad.ST (ST)
 import Data.Massiv.Array as A
-import qualified Data.Vector.Unboxed as VU
 import Debug.Trace
 import Prelude as P
 
--- 方針
--- memo 配列からの参照、ではなく、mutable arrayへの書き込み操作を生成する
--- f の再帰呼び出しを配列からの読み込みとしてエンコード (R)
--- f の実行結果を配列への書き込みへエンコード (W)
--- 答えの呼び出し前に、ある順番で配列を舐める
+-- https://atcoder.jp/contests/dp/tasks/dp_d
+-- 187 ms, 82984 KB, AC
+main :: IO ()
+main = do
+  [n, maxW] <- Data.List.unfoldr (BS.readInt . BS.dropWhile isSpace) <$> BS.getLine
+  mat <- VU.replicateM n $ (\v -> (v VU.! 0, v VU.! 1)) . VU.unfoldr (BS.readInt . BS.dropWhile isSpace) <$> BS.getLine
+  let (ws, vs) = VU.unzip mat  
+  print $ knapsack ws vs (Ix2 0 0) (Sz2 n maxW + 1) 0 (Ix2 n maxW)
 
 newtype DPRead a m i e = R {get :: MArray (PrimState m) a i e -> m e}
 
@@ -55,12 +69,6 @@ wplus f g = W $ \arr -> do
   f `run` arr
   g `run` arr
 
-instance Monad m => Semigroup (DPWrite a m i e) where
-  (<>) = wplus
-
-instance Monad m => Monoid (DPWrite a m i e) where
-  mempty = wzero
-
 f' :: (Mutable a i e, PrimMonad m, MonadThrow m) => i -> DPRead a m i e
 f' i = R $ \arr -> do readM arr i
 
@@ -72,22 +80,11 @@ instance (Num e, Monad m) => Num (DPRead a m i e) where
   fromInteger = toR fromInteger
   negate = liftR negate
 
--- >>> fib (Ix1 0) (Sz1 1000) 0 30
--- 1346269
-fib :: Ix1 -> Sz1 -> Int -> Ix1 -> Int
-fib ix sz e n = dp ! n
-  where
-    f 0 = 1
-    f 1 = 1
-    f (n + 2) = f' n + f' (n + 1)
-
-    dp = createArrayST_ @U sz $ \arr -> A.mapM_ (\i -> (i @= f i) `run` arr) $ rangeSize Seq ix sz
-
--- 注意: (Sz2 6 maxW + 1) = Sz (7 :. 10)
--- >>> knapsack (Ix2 0 0) (Sz2 6 maxW + 1) 0 (Ix2 6 maxW)
--- 94
-knapsack :: Ix2 -> Sz2 -> Int -> Ix2 -> Int
-knapsack ix sz e ans =
+-- 注意: (Sz2 6 9 + 1) = Sz (7 :. 10)
+-- >>> knapsack (VU.fromList [3,4,5]) (VU.fromList [30,50,60]) (Ix2 0 0) (Sz2 3 8 + 1) 0 (Ix2 3 8)
+-- 90
+knapsack :: VU.Vector Int -> VU.Vector Int -> Ix2 -> Sz2 -> Int -> Ix2 -> Int
+knapsack weight value ix sz e ans =
   -- traceShow dp $
   dp ! ans
   where
@@ -97,12 +94,3 @@ knapsack ix sz e ans =
       | otherwise = f' (i :. w)
 
     dp = createArrayST_ @U sz $ \arr -> A.mapM_ (\i -> (i @= f i) `run` arr) $ rangeSize Seq ix sz
-
-value :: VU.Vector Int
-value = VU.fromList [3, 2, 6, 1, 3, 85]
-
-weight :: VU.Vector Int
-weight = VU.fromList [2, 1, 3, 2, 1, 5]
-
-maxW :: Int
-maxW = 9
