@@ -28,13 +28,15 @@ fibAns = fib 30
     ub :: Int
     ub = 1000
 
+-- >>> knapsackAns
+-- 94
 knapsackAns :: Int
-knapsackAns = knapsack 6 maxW
+knapsackAns = traceShow memo $ knapsack 6 maxW
   where
     knapsack :: Int -> Int -> Int
     knapsack 0 w = 0
     knapsack (i+1) w
-      | w >= weight ! i = knapsack' i (w - (weight ! i)) + value ! i `max` knapsack' i w
+      | w >= weight ! i = max (knapsack' i (w - (weight ! i)) + (value ! i)) (knapsack' i w)
       | otherwise = knapsack' i w
 
     knapsack' = curry (memo !)
@@ -44,7 +46,7 @@ knapsackAns = knapsack 6 maxW
     lb = (0, 0)
 
     ub :: (Int, Int)
-    ub = (1000, 1000)
+    ub = (6, maxW)
 
     value :: Array Int Int
     value = listArray (0, 5) [3, 2, 6, 1, 3, 85]

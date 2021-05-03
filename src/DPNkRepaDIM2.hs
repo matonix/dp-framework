@@ -20,8 +20,7 @@ import Prelude as P
 import Data.Array.Repa as A
 import Data.Array.Repa.Repr.Vector (V)
 
-{-# ANN module "HLint: ignore Eta reduce" #-}
-
+-- https://atcoder.jp/contests/dp/tasks/dp_d
 main :: IO ()
 main = do
   [n, maxW] <- unfoldr (BS.readInt . BS.dropWhile isSpace) <$> BS.getLine
