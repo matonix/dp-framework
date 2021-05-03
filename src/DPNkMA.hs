@@ -2,7 +2,6 @@
 {-# LANGUAGE NPlusKPatterns #-}
 {-# LANGUAGE TypeApplications #-}
 
-{-# LANGUAGE FlexibleContexts #-}
 module DPNkMA where
 
 import Control.Applicative (liftA2)
@@ -87,6 +86,7 @@ knapsack :: ((Int, Int), (Int, Int)) -> Int -> (Int, Int) -> Int
 knapsack lub e (n, w) = -- traceShow dp $ 
   dp ! (n, w)
   where
+    f :: (Int, Int) -> R (STUArray s) (ST s) (Int, Int) Int
     f (0, w) = 0
     f (i + 1, w)
       | w >= weight ! i = liftR2 max (f' (i, w - (weight ! i)) + mkR (value ! i)) (f' (i, w))
