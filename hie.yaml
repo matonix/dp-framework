@@ -3,8 +3,3 @@ cradle:
     - path: "src"
       component: "lib:dp-framework"
 
-    - path: "app/Main.hs"
-      component: "dp-framework:exe:dp-framework"
-
-    - path: "test"
-      component: "dp-framework:test:dp-framework-test"

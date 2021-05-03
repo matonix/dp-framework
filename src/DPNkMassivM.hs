@@ -47,19 +47,10 @@ i @= a = W $ \arr -> do
 
 infixr 0 @=
 
-wzero :: Monad m => DPWrite a m i e
-wzero = W $ \arr -> do return ()
-
-wplus :: Monad m => DPWrite a m i e -> DPWrite a m i e -> DPWrite a m i e
-wplus f g = W $ \arr -> do
-  f `run` arr
-  g `run` arr
-
-instance Monad m => Semigroup (DPWrite a m i e) where
-  (<>) = wplus
-
-instance Monad m => Monoid (DPWrite a m i e) where
-  mempty = wzero
+mkW :: (Mutable a i e, PrimMonad m) => (i -> DPRead a m i e) -> MArray (PrimState m) a i e -> i -> m ()
+mkW f arr i = do
+  e <- f i `get` arr
+  write_ arr i e
 
 f' :: (Mutable a i e, PrimMonad m, MonadThrow m) => i -> DPRead a m i e
 f' i = R $ \arr -> do readM arr i
@@ -81,7 +72,7 @@ fib ix sz e n = dp ! n
     f 1 = 1
     f (n + 2) = f' n + f' (n + 1)
 
-    dp = createArrayST_ @U sz $ \arr -> A.mapM_ (\i -> (i @= f i) `run` arr) $ rangeSize Seq ix sz
+    dp = createArrayST_ @U sz $ \arr -> A.mapM_ (mkW f arr) $ rangeSize Seq ix sz
 
 -- 注意: (Sz2 6 maxW + 1) = Sz (7 :. 10)
 -- >>> knapsack (Ix2 0 0) (Sz2 6 maxW + 1) 0 (Ix2 6 maxW)
@@ -96,7 +87,7 @@ knapsack ix sz e ans =
       | w >= weight VU.! i = liftR2 max (f' (i :. w - (weight VU.! i)) + mkR (value VU.! i)) (f' (i :. w))
       | otherwise = f' (i :. w)
 
-    dp = createArrayST_ @U sz $ \arr -> A.mapM_ (\i -> (i @= f i) `run` arr) $ rangeSize Seq ix sz
+    dp = createArrayST_ @U sz $ \arr -> A.mapM_ (mkW f arr) $ rangeSize Seq ix sz
 
 value :: VU.Vector Int
 value = VU.fromList [3, 2, 6, 1, 3, 85]
